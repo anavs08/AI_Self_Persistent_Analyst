@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Node
+node_modules/
+.next/
+.env.local
+
+# Model weights (large files)
+backend/models/*.gguf
+backend/models/*.bin
+backend/models/mistral-analyst-*/
+
+# ChromaDB data
+backend/data/
+
+# OS
+.DS_Store

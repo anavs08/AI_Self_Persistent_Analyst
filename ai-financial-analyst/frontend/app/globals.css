@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:#080c12;--bg-2:#0e1520;--bg-3:#141d2b;
+  --border:#1e2d42;--border-2:#243448;
+  --text:#e2eaf5;--text-muted:#5a7394;--text-dim:#3a5270;
+  --accent:#00d4ff;--accent-2:#0099bb;--accent-glow:rgba(0,212,255,0.15);
+  --green:#00e5a0;--green-glow:rgba(0,229,160,0.12);
+  --amber:#f59e0b;--amber-glow:rgba(245,158,11,0.12);
+  --red:#f43f5e;--red-glow:rgba(244,63,94,0.12);
+  --font-display:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;--font-mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow:hidden;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:2px;}
+.font-display{font-family:var(--font-display);}
+.font-mono{font-family:var(--font-mono);}
+.grid-bg{background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.8);}}
+.pulse-dot{animation:pulse-dot 1.5s ease-in-out infinite;}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.fade-in{animation:fadeInUp .4s ease forwards;}
+.fade-in-1{animation:fadeInUp .4s .05s ease both;}
+.fade-in-2{animation:fadeInUp .4s .1s ease both;}
+.fade-in-3{animation:fadeInUp .4s .15s ease both;}
+.fade-in-4{animation:fadeInUp .4s .2s ease both;}
+@keyframes ticker{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+.ticker-inner{animation:ticker 30s linear infinite;}
+@keyframes bubbleIn{from{opacity:0;transform:translateY(6px) scale(.98);}to{opacity:1;transform:translateY(0) scale(1);}}
+.bubble-in{animation:bubbleIn .2s ease forwards;}
+@keyframes blink{0%,100%{opacity:.2;}50%{opacity:1;}}
+.typing-dot:nth-child(1){animation:blink 1s 0s infinite;}
+.typing-dot:nth-child(2){animation:blink 1s .2s infinite;}
+.typing-dot:nth-child(3){animation:blink 1s .4s infinite;}
