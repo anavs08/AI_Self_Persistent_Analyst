@@ -4,8 +4,7 @@
 
 A self-persistent AI financial analyst that continuously learns from its own interactions. Every analyst response is embedded and written back into a ChromaDB vector store, enriching future queries through a **Retrieval-Augmented Continual Learning (RACL)** feedback loop.
 
-**Demo:** [https://YOUR_VIDEO_LINK_HERE]  
-**Report:** See `/docs/as6812.pdf`
+**Demo:** https://www.youtube.com/watch?v=T7xpqOItEoA
 
 ---
 
