@@ -1,241 +1,256 @@
 # AI Financial Analyst — Self-Persistent Learning System
 
-An AI financial analyst that continuously learns from market data, SEC filings,
-and financial news using LoRA continual fine-tuning on Mistral-7B.
+> EECS E6895 Advanced Big Data and AI · Columbia University · Anav Srinivas
+
+A self-persistent AI financial analyst that continuously learns from its own interactions. Every analyst response is embedded and written back into a ChromaDB vector store, enriching future queries through a **Retrieval-Augmented Continual Learning (RACL)** feedback loop.
+
+**Demo:** [https://YOUR_VIDEO_LINK_HERE]  
+**Report:** See `/docs/as6812.pdf`
 
 ---
 
-## Architecture
+## What it does
 
-```
-Data Sources          Processing Layer         Reasoning & Output
-─────────────         ─────────────────        ──────────────────
-Market Data    ──►    Data Ingestion    ──►    Reasoning Engine
-SEC Filings    ──►    & Embedding       ──►    (Mistral-7B + LoRA)
-Financial News ──►                      ──►    Analyst Output
-Macro (FRED)   ──►    Memory Layer      ──►    (Reports / Chat)
-                      ├─ Long-Term VDB          │
-                      ├─ Episodic Buffer         │
-                      └─ Replay Buffer  ◄────────┘ (feedback loop)
-```
-
-**Stack**
-| Layer | Technology |
-|-------|-----------|
-| UI | Next.js 14 (App Router) + Tailwind |
-| Backend API | FastAPI (Python) |
-| Vector Store | ChromaDB (local persistent) |
-| Embeddings | all-MiniLM-L6-v2 (sentence-transformers) |
-| Base Model | Mistral-7B-Instruct-v0.3 |
-| Fine-Tuning | PEFT / LoRA via HuggingFace |
-| Market Data | yfinance |
-| Filings | SEC EDGAR API |
-| News | RSS (Reuters, FT, WSJ, Yahoo Finance) |
-| Macro | FRED API (St. Louis Fed) |
+- Ingests real financial data from 4 public APIs on a continuous schedule
+- Answers financial questions using Claude Sonnet with RAG over a local ChromaDB store
+- Stores every analyst response as an insight chunk — retrieved in future queries
+- Invokes 9 quantitative financial tools automatically (DCF, CAPM, Sharpe, VaR, WACC, etc.)
+- Applies staleness decay, Jaccard deduplication, and context-window ordering to maintain retrieval quality
+- Evaluates itself with Precision@5, MRR, LLM-as-judge faithfulness, and an A/B self-persistence test
 
 ---
 
-## Project Structure
+## System Architecture
+
+```
+Data Sources          Memory Layer              Reasoning
+─────────────         ─────────────────         ──────────────────
+Alpha Vantage  ──┐    Long-Term Store   ──┐     RAG Retriever
+SEC EDGAR      ──┼──► Episodic Buffer   ──┼───► Claude Sonnet ──► Response
+FRED API       ──┤    Insight Store  ◄──┘       9 Financial Tools    │
+AV News        ──┘    (self-generated)                               │
+                       ▲                                             │
+                       └─────── Embed + Tag ◄────────────────────────┘
+                                (RACL feedback loop)
+```
+
+---
+
+## Repository Structure
 
 ```
 ai-financial-analyst/
-├── frontend/                   # Next.js app
-│   ├── app/
-│   │   ├── layout.tsx
-│   │   ├── page.tsx            # Root — sidebar + view router
-│   │   └── globals.css
-│   ├── components/
-│   │   ├── Sidebar.tsx         # Nav + system status
-│   │   ├── Dashboard.tsx       # Ticker tape, metrics, charts
-│   │   ├── DataSources.tsx     # Per-source ingestion control
-│   │   ├── Training.tsx        # LoRA config + loss chart
-│   │   └── Chat.tsx            # RAG-augmented analyst chat
-│   ├── .env.local
-│   └── package.json
-│
-├── backend/                    # FastAPI app
-│   ├── main.py                 # App entry point + CORS
-│   ├── requirements.txt
-│   ├── .env
-│   ├── ingestion/
-│   │   ├── market.py           # yfinance OHLCV fetcher
-│   │   ├── filings.py          # SEC EDGAR async fetcher
-│   │   ├── news.py             # RSS feed ingestion
-│   │   └── macro.py            # FRED macro indicators
-│   ├── memory/
-│   │   ├── store.py            # ChromaDB interface (3 collections)
-│   │   └── retriever.py        # RAG retriever + prompt builder
+├── backend/
 │   ├── api/
-│   │   └── routes.py           # All /api/v1/* endpoints
-│   └── data/
-│       └── chromadb/           # Persistent vector store (auto-created)
-│
-└── README.md
+│   │   └── routes.py          # All FastAPI endpoints
+│   ├── ingestion/
+│   │   ├── market.py          # Alpha Vantage OHLCV
+│   │   ├── filings.py         # SEC EDGAR
+│   │   ├── news.py            # AV News Sentiment
+│   │   ├── macro.py           # FRED macro indicators
+│   │   └── on_demand.py       # Any-ticker fetch
+│   ├── memory/
+│   │   ├── store.py           # ChromaDB collections
+│   │   ├── retriever.py       # RAG retrieval + prompt builder
+│   │   ├── session_memory.py  # Insight store writer
+│   │   └── memory_manager.py  # Staleness decay + pruning
+│   ├── tools/
+│   │   └── finance.py         # 9 financial calculation tools
+│   ├── evaluation/
+│   │   └── question_bank.py   # 50-question benchmark bank
+│   ├── enhanced_eval.py       # Precision@5, MRR, faithfulness, A/B test
+│   ├── scheduler.py           # APScheduler ingestion jobs
+│   ├── main.py                # FastAPI app entry point
+│   ├── requirements.txt
+│   └── .env.example
+└── frontend/
+    ├── app/
+    │   └── page.tsx           # Root layout + tab routing
+    └── components/
+        ├── Sidebar.tsx        # Navigation
+        ├── DataSources.tsx    # Ingestion control + live counts
+        ├── MemoryMonitor.tsx  # Insight store browser
+        ├── Chat.tsx           # Streaming analyst chat
+        ├── TickerFetch.tsx    # On-demand ticker ingestion
+        └── Evaluation.tsx     # Benchmark suite UI
 ```
 
 ---
 
-## Quick Start
+## Setup
 
-### 1. Backend
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- API keys for: [Alpha Vantage](https://www.alphavantage.co/) (premium recommended), [FRED](https://fred.stlouisfed.org/docs/api/fred/), [Anthropic](https://console.anthropic.com/)
+
+---
+
+### 1. Clone
+
+```bash
+git clone https://github.com/YOUR_USERNAME/ai-financial-analyst.git
+cd ai-financial-analyst
+```
+
+### 2. Backend
 
 ```bash
 cd backend
-
-# Create virtual environment
-python3 -m venv venv
+python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
+```
 
-# Copy and configure env
+Create your `.env` file:
+
+```bash
 cp .env.example .env
-# Edit .env — add FRED_API_KEY if you have one (free at fred.stlouisfed.org)
+```
 
-# Start the API
+Fill in `.env`:
+
+```env
+ALPHA_VANTAGE_KEY=your_key_here
+FRED_API_KEY=your_key_here
+ANTHROPIC_API_KEY=sk-ant-...
+CHROMA_PATH=./data/chroma_db
+```
+
+Start the backend:
+
+```bash
 uvicorn main:app --reload --port 8000
 ```
 
-API docs available at: http://localhost:8000/docs
+The API will be available at `http://localhost:8000`. Swagger docs at `http://localhost:8000/docs`.
 
-### 2. Frontend
+### 3. Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Copy env
-cp .env.local.example .env.local
-
-# Start dev server
 npm run dev
 ```
 
-Open: http://localhost:3000
+Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## API Endpoints
+## Usage
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /health | System health check |
-| GET | /api/v1/status | Memory stats + model info |
-| GET | /api/v1/prices | Latest ticker prices |
-| POST | /api/v1/ingest | Trigger ingestion for a source |
-| GET | /api/v1/ingest/status | Record counts per source |
-| POST | /api/v1/chat | RAG-augmented analyst query |
-| POST | /api/v1/train/start | Start LoRA fine-tuning run |
-| GET | /api/v1/train/history | Past training run metadata |
+### Ingesting Data
 
-### Example: Trigger market data ingestion
+Go to the **Data Sources** tab and click **Run Now** on any source, or wait for the scheduler to run automatically:
 
-```bash
-curl -X POST http://localhost:8000/api/v1/ingest \
-  -H "Content-Type: application/json" \
-  -d '{"source": "market", "tickers": ["AAPL","MSFT","NVDA"], "period": "5d"}'
+| Source | Schedule | Content |
+|--------|----------|---------|
+| Alpha Vantage | Every 15 min | OHLCV for 9 tickers |
+| AV News | Every 2 h | News sentiment per ticker |
+| FRED API | Every 6 h | CPI, GDP, Fed Funds, VIX |
+| SEC EDGAR | Every 12 h | 10-K, 10-Q, 8-K filings |
+
+### Chatting with the Analyst
+
+Go to the **Analyst Chat** tab and ask any financial question. The analyst will:
+- Retrieve relevant chunks from the vector store
+- Invoke financial tools automatically for quantitative questions
+- Store its response back into ChromaDB for future retrieval
+
+Example questions:
+```
+"What has NVDA's price trend been over the last month?"
+"Calculate AAPL's expected return using CAPM with beta 1.2"
+"What does the current yield curve signal about recession risk?"
+"Run a DCF on AMZN assuming FCF growth of 15% for 5 years and 10% WACC"
 ```
 
-### Example: Chat query
+### Fetching Any Ticker On-Demand
 
-```bash
-curl -X POST http://localhost:8000/api/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "What do recent NVDA earnings say about AI demand?"}'
-```
+Go to the **Fetch Ticker** tab, type any ticker symbol (e.g. `PLTR`, `COIN`, `SNOW`) and click Fetch. The system retrieves price, overview, filings, and news in one call.
+
+### Running Evaluations
+
+Go to the **Evaluation** tab. Three benchmark suites:
+
+| Panel | What it measures |
+|-------|-----------------|
+| Retrieval Quality | Precision@5, MRR, relevance, source hit rate across 10 labelled queries |
+| Faithfulness | LLM-as-judge claim verification against retrieved context (4 questions, ~60s) |
+| A/B Self-Persistence | Retrieval WITH vs WITHOUT insight store — directly measures RACL loop contribution |
 
 ---
 
-## Adding the Model
+## Financial Tools
 
-The backend is ready to serve a local Mistral-7B model. Two options:
+The analyst invokes these automatically via the Anthropic tool-use API:
 
-### Option A: llama-cpp-python (CPU-friendly, GGUF)
-
-```bash
-pip install llama-cpp-python
-# Download GGUF from HuggingFace:
-# https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.3-GGUF
-# Place in: backend/models/mistral-7b-instruct-v0.3.Q4_K_M.gguf
-```
-
-Then uncomment the llama-cpp block in `api/routes.py`.
-
-### Option B: HuggingFace Transformers + LoRA (GPU required)
-
-```bash
-pip install torch transformers peft accelerate bitsandbytes
-# Model downloads automatically on first run via HuggingFace hub
-```
-
-Then uncomment the HuggingFace block in `api/routes.py`.
+| Tool | Description |
+|------|-------------|
+| `dcf_valuation` | Discounted Cash Flow with terminal value |
+| `dividend_discount_model` | Gordon Growth Model |
+| `capm_expected_return` | Capital Asset Pricing Model |
+| `sharpe_ratio` | Risk-adjusted return |
+| `value_at_risk` | Parametric VaR at configurable confidence |
+| `bond_pricing` | Price + Macaulay Duration |
+| `wacc_calculator` | Weighted Average Cost of Capital |
+| `pe_fair_value` | P/E fair value + PEG ratio |
+| `portfolio_metrics` | Return, volatility, Sharpe for a portfolio |
 
 ---
 
-## Running a Training Run
+## Evaluation Results
 
-Once data is ingested into ChromaDB:
+Results from a live system after one week of operation:
 
-1. Open the **Training** tab in the UI
-2. Adjust LoRA rank, learning rate, and steps
-3. Click **Start Run**
+| Metric | Value |
+|--------|-------|
+| Precision@5 | 0.927 |
+| Mean Reciprocal Rank | 1.000 |
+| Avg Faithfulness (LLM-as-judge) | 0.49 |
+| Tool Compliance | 1.00 |
+| A/B ΔPrecision@5 (with vs without insights) | +0.280 |
+| A/B ΔMRR | +0.150 |
 
-Or via API:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/train/start \
-  -H "Content-Type: application/json" \
-  -d '{"lora_rank": 16, "learning_rate": 2e-4, "max_steps": 500, "batch_size": 4}'
-```
-
-The training pipeline:
-1. Samples the replay buffer from ChromaDB (prevents catastrophic forgetting)
-2. Combines replay samples with new ingested chunks
-3. Runs LoRA fine-tuning for the configured steps
-4. Saves the adapter to `backend/models/mistral-analyst-vN/`
+The +28% Precision@5 improvement in the A/B test is direct empirical evidence that the RACL self-persistence loop improves retrieval quality over time.
 
 ---
 
-## Environment Variables
+## API Reference
 
-### Backend (`backend/.env`)
+Base URL: `http://localhost:8000/api/v1`
 
-```env
-CHROMA_PATH=./data/chromadb
-FRED_API_KEY=                  # Optional — free at fred.stlouisfed.org
-MODEL_PATH=./models/mistral-7b-instruct-v0.3.Q4_K_M.gguf
-LORA_ADAPTER_PATH=./models/mistral-analyst-v7
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/status` | System status + insight count |
+| GET | `/prices` | Latest prices for ticker list |
+| POST | `/ingest` | Trigger source ingestion |
+| GET | `/ingest/status` | Chunk counts per source |
+| POST | `/fetch/ticker` | On-demand ticker ingestion |
+| POST | `/chat` | RAG chat (non-streaming) |
+| POST | `/chat/stream` | SSE streaming chat |
+| GET | `/insights` | All stored insights with tags |
+| POST | `/memory/prune` | Prune stale insights |
+| POST | `/eval/enhanced/retrieval` | Run Precision@5 + MRR benchmark |
+| POST | `/eval/faithfulness` | Run LLM-as-judge evaluation |
+| POST | `/eval/ab_persistence` | Run A/B self-persistence test |
+| GET | `/eval/memory_health` | Memory health metrics |
+| GET | `/scheduler/status` | Scheduler job next-run times |
 
-### Frontend (`frontend/.env.local`)
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-```
-
----
-
-## Continual Learning Strategy
-
-To prevent catastrophic forgetting during LoRA fine-tuning:
-
-1. **Replay Buffer** — `memory/store.py::sample_replay_buffer()` randomly samples
-   previously ingested chunks and mixes them into each training batch.
-2. **Elastic Weight Consolidation (EWC)** — planned for v0.2: penalizes changes
-   to weights that were important for previous tasks.
-3. **Episodic Buffer** — the 2K most recent chunks are kept in a separate
-   collection for fast recent-context retrieval during inference.
+Full interactive docs: `http://localhost:8000/docs`
 
 ---
 
-## Roadmap
+## Tech Stack
 
-- [ ] v0.1 — UI + ingestion pipeline (current)
-- [ ] v0.2 — Live Mistral inference via llama-cpp-python
-- [ ] v0.3 — Automated LoRA training on ingestion schedule
-- [ ] v0.4 — EWC regularization + per-task adapters
-- [ ] v0.5 — Streaming chat responses (SSE)
-- [ ] v0.6 — Portfolio tracking + signal generation
+| Layer | Technology |
+|-------|-----------|
+| LLM | Claude Sonnet (`claude-sonnet-4-5`) via Anthropic API |
+| Vector Store | ChromaDB (local) |
+| Embeddings | `all-MiniLM-L6-v2` (sentence-transformers) |
+| Backend | Python 3.11, FastAPI, APScheduler |
+| Frontend | Next.js 14, TypeScript, Recharts |
+| Data | Alpha Vantage (premium), SEC EDGAR, FRED, AV News |
+
+---
